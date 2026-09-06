@@ -18,3 +18,9 @@ models/
 
 # Rendered deck previews. The .pptx is the artefact; these are throwaway.
 deck-render/
+# A throwaway virtualenv that carries a static ffmpeg for the deck's poster frames.
+.venv-deck/
+
+# The built deck. 129 MB with the three videos embedded, which is past what GitHub accepts —
+# and it is an artefact anyway: tools/build_deck.py plus the videos reproduce it exactly.
+ClashFit.pptx

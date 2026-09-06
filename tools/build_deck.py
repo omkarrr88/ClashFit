@@ -121,6 +121,42 @@ def phone(s, img, x, y, height):
     return w
 
 
+def device(s, img, x, y, height, label=None):
+    """
+    A screenshot inside a phone, rather than floating on the page.
+
+    The landing page frames every screen this way and it is the single cheapest thing that makes
+    a screenshot read as a product rather than as a picture of one — on a light deck especially,
+    where an unframed dark rectangle looks like a hole. The body is drawn rather than composited
+    so it costs nothing and scales with the slide.
+    """
+    from PIL import Image
+    with Image.open(img) as im:
+        ratio = im.size[0] / im.size[1]
+    w = Emu(int(height * ratio))
+    bez = Emu(int(height * 0.022))          # the bezel around the glass
+    body_w, body_h = Emu(w + 2 * bez), Emu(height + 2 * bez)
+
+    shell = s.shapes.add_shape(5, Emu(x - bez), Emu(y - bez), body_w, body_h)
+    shell.fill.solid()
+    # A white body, not a black one. On a light deck a dark bezel reads as a heavy border drawn
+    # around the screen; a white one disappears into the page and leaves the dark app screen as
+    # the only thing with weight on it, which is the thing worth looking at.
+    shell.fill.fore_color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+    shell.line.color.rgb = RGBColor(0xC9, 0xC6, 0xC0)
+    shell.line.width = Pt(1.25)
+    shell.shadow.inherit = False
+    shell.adjustments[0] = 0.055
+
+    pic = s.shapes.add_picture(img, x, y, width=w, height=height)
+    pic.line.fill.background()
+
+    if label:
+        text(s, Emu(x - bez), Emu(y + height + bez) + Inches(0.14), body_w, Inches(0.3),
+             label, size=10, color=MUTED, align=PP_ALIGN.CENTER)
+    return Emu(w + 2 * bez)
+
+
 def stat(s, x, y, w, value, label, color=EMBER):
     text(s, x, y, w, Inches(0.7), value, size=40, bold=True, color=color, align=PP_ALIGN.CENTER)
     text(s, x, y + Inches(0.72), w, Inches(0.4), label.upper(), size=10,
@@ -131,18 +167,45 @@ def a(p):
     return os.path.join(ASSETS, p)
 
 
+def _ffmpeg():
+    """
+    Wherever ffmpeg happens to be.
+
+    Without a poster frame PowerPoint draws a grey rectangle where the video is, which on a light
+    deck looks like a broken image rather than something to press play on. The system has no
+    ffmpeg and pip refuses to install into it, so a throwaway virtualenv beside the project
+    carries a static one.
+    """
+    local = os.path.join(ROOT, ".venv-deck", "bin", "python")
+    if os.path.exists(local):
+        out = subprocess.run(
+            [local, "-c", "import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())"],
+            capture_output=True, text=True,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    return "ffmpeg"
+
+
 def video_slot(s, x, y, w, h, path, caption):
     """A video if we have one, a labelled placeholder if we do not."""
     if path and os.path.exists(path):
-        poster = path + ".poster.png"
+        # The poster is what the slide shows until somebody presses play, so it is worth having.
+        # ffmpeg gives a real frame from the clip; without it PowerPoint falls back to a grey
+        # rectangle, which on a light deck looks like a broken image rather than a video.
+        poster = os.path.join(ASSETS, os.path.basename(path) + ".poster.jpg")
         if not os.path.exists(poster):
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", path, "-vf", "select=eq(n\\,20)", "-vframes", "1", poster],
-                capture_output=True,
-            )
+            try:
+                subprocess.run(
+                    [_ffmpeg(), "-y", "-ss", "2", "-i", path, "-frames:v", "1",
+                     "-q:v", "3", poster],
+                    capture_output=True, check=True,
+                )
+            except (OSError, subprocess.CalledProcessError, RuntimeError):
+                poster = None
         s.shapes.add_movie(
             path, x, y, w, h,
-            poster_frame_image=poster if os.path.exists(poster) else None,
+            poster_frame_image=poster if poster and os.path.exists(poster) else None,
             mime_type="video/mp4",
         )
     else:
@@ -151,6 +214,50 @@ def video_slot(s, x, y, w, h, path, caption):
              "▶\nvideo drops in here", size=13, color=FAINT, align=PP_ALIGN.CENTER)
     text(s, x, y + h + Inches(0.12), w, Inches(0.3), caption, size=11,
          color=MUTED, align=PP_ALIGN.CENTER)
+
+
+
+def _lines(body, size_pt, width_in, tight=False):
+    """
+    How many lines this text will take at this size in this width.
+
+    python-pptx cannot measure text and PowerPoint will happily let a box overflow onto whatever
+    is beneath it, which is exactly what went wrong: every heading longer than its box wrapped
+    silently and its second line landed under the next element. This estimates the wrap so the
+    layout can reserve the right height instead of guessing one.
+
+    The factor is the average advance width of this font as a fraction of point size — narrower
+    for the bold display sizes, wider for body copy. Rounded up, and never less than the explicit
+    line breaks the caller wrote.
+    """
+    import math
+    # Measured off a render rather than guessed: at 38pt in 7.1in the bold face fits about 20
+    # characters, which puts its average advance at 0.67 of point size. The first guess of 0.48
+    # was optimistic enough to predict one line where two appeared, and the second line landed
+    # underneath the next element.
+    factor = 0.68 if tight else 0.52
+    per_line = max(1, int((width_in * 72.0) / (size_pt * factor)))
+    total = 0
+    for para in body.split("\n"):
+        total += max(1, math.ceil(len(para) / per_line))
+    return total
+
+
+def heading(s, x, y, w, copy, size=40):
+    """A heading that reserves the height it will actually occupy, and says where it ends."""
+    n = _lines(copy, size, w / 914400, tight=True)
+    h = Inches(n * size * 1.16 / 72.0)
+    text(s, x, y, w, h, copy, size=size, bold=True, spacing=1.16)
+    return y + h
+
+
+def body(s, x, y, w, copy, size=16, color=None, spacing=1.4):
+    """Body copy that reserves its height too, and says where it ends."""
+    c = MUTED if color is None else color
+    n = _lines(copy, size, w / 914400)
+    h = Inches(n * size * spacing / 72.0)
+    text(s, x, y, w, h, copy, size=size, color=c, spacing=spacing)
+    return y + h
 
 
 def build(zombie, walk):
@@ -171,24 +278,25 @@ def build(zombie, walk):
     text(s, Inches(0.95), Inches(6.5), Inches(6), Inches(0.4),
          "Team Da Goats  ·  Omkar Kadam · Ujjwal Pardeshi  ·  iQOO Hackathon 2026",
          size=12, color=MUTED)
-    phone(s, a("51-fight-landing.png"), Inches(9.6), Inches(0.75), Inches(6.0))
+    device(s, a("51-fight-landing.png"), Inches(9.6), Inches(0.8), Inches(5.9), "iQOO 15")
 
     # ── 2 · the problem ───────────────────────────────────────────────────────────────────
     s = slide(prs)
     kicker(s, Inches(0.9), Inches(0.8), "the problem")
-    text(s, Inches(0.9), Inches(1.2), Inches(11.5), Inches(1.4),
-         "Fitness apps count what you tell them.", size=44, bold=True)
-    text(s, Inches(0.9), Inches(2.75), Inches(5.4), Inches(2.2),
+    y = heading(s, Inches(0.9), Inches(1.2), Inches(11.5),
+                "Fitness apps count what you tell them.", size=42)
+    y += Inches(0.35)
+    col = Inches(5.4)
+    body(s, Inches(0.9), y, col,
          "You type in three sets of ten. The app believes you.\n\n"
-         "It never saw the reps, so it cannot know whether they were deep, "
-         "controlled, or worth anything at all — and neither can you.",
-         size=16, color=MUTED, spacing=1.4)
-    card(s, Inches(6.9), Inches(2.4), Inches(5.5), Inches(2.5))
-    text(s, Inches(7.3), Inches(2.75), Inches(4.7), Inches(2),
+         "It never saw the reps, so it cannot know whether they were deep, controlled, "
+         "or worth anything at all — and neither can you.")
+    card(s, Inches(6.9), y - Inches(0.15), Inches(5.5), Inches(2.45))
+    text(s, Inches(7.3), y + Inches(0.2), Inches(4.7), Inches(1.9),
          "So the number that motivates you\nis the one number nobody checked.\n\n"
          "Make the camera the referee and\nevery number becomes evidence.",
-         size=19, color=INK, spacing=1.45)
-    text(s, Inches(0.9), Inches(5.4), Inches(11.5), Inches(0.9),
+         size=17, color=INK, spacing=1.4)
+    body(s, Inches(0.9), Inches(5.6), Inches(11.5),
          "ClashFit scores depth, range, tempo and alignment on every single rep, on the phone, "
          "and pays you in damage for the good ones.",
          size=16, color=EMBER, spacing=1.35)
@@ -196,93 +304,91 @@ def build(zombie, walk):
     # ── 3 · the product ───────────────────────────────────────────────────────────────────
     s = slide(prs)
     kicker(s, Inches(0.9), Inches(0.55), "the product")
-    text(s, Inches(0.9), Inches(0.95), Inches(11), Inches(0.8),
-         "A rep is a hit. A sloppy rep is a weak one.", size=36, bold=True)
+    heading(s, Inches(0.9), Inches(0.95), Inches(11.5), "A rep is a hit. A sloppy rep is a weak one.", size=34)
     for i, (img, cap) in enumerate([
         ("51-fight-landing.png", "The fight — boss HP, combo, fatigue"),
         ("36-seeded-summary.png", "Every rep graded, after the set"),
         ("30-seeded-progress.png", "Form over time, measured"),
         ("2f-rewards.png", "Rewards earned by clean reps"),
     ]):
-        x = Inches(0.9 + i * 3.05)
-        phone(s, a(img), x, Inches(1.95), Inches(4.35))
-        text(s, x - Inches(0.3), Inches(6.45), Inches(2.6), Inches(0.5), cap,
-             size=10, color=MUTED, align=PP_ALIGN.CENTER)
+        x = Inches(0.95 + i * 3.05)
+        device(s, a(img), x, Inches(2.05), Inches(4.2), cap)
 
     # ── 4 · the referee ───────────────────────────────────────────────────────────────────
     s = slide(prs)
     kicker(s, Inches(0.9), Inches(0.7), "how it judges")
-    text(s, Inches(0.9), Inches(1.1), Inches(11), Inches(0.9),
-         "The referee: 33 landmarks, every frame.", size=40, bold=True)
+    # 7.1in, not 11: the phone occupies the right of this slide, and a heading that ran the full
+    # width wrapped underneath it and put its second line beneath the first card.
+    y = heading(s, Inches(0.9), Inches(1.1), Inches(7.1), "33 landmarks, every frame.", size=38)
+    y += Inches(0.4)
     items = [
         ("MediaPipe PoseLandmarker", "33 body points, on-device, at camera rate"),
         ("Four measurements per rep", "depth · range of motion · tempo · alignment"),
         ("A fatigue estimate", "velocity and range loss against your own baseline"),
         ("Nothing is stored", "frames are read, scored and discarded in the same instant"),
     ]
-    for i, (t, d) in enumerate(items):
-        y = Inches(2.25 + i * 1.05)
-        card(s, Inches(0.9), y, Inches(6.9), Inches(0.9))
-        text(s, Inches(1.25), y + Inches(0.14), Inches(6.3), Inches(0.35), t, size=15, bold=True)
-        text(s, Inches(1.25), y + Inches(0.5), Inches(6.3), Inches(0.3), d, size=11, color=MUTED)
-    phone(s, a("a0-workout-midset.png"), Inches(8.4), Inches(1.0), Inches(6.0))
-    text(s, Inches(8.2), Inches(7.05), Inches(3.4), Inches(0.35),
-         "Workout mode — the same referee, coaching", size=10, color=MUTED, align=PP_ALIGN.CENTER)
+    for t, d in items:
+        card(s, Inches(0.9), y, Inches(6.9), Inches(0.92))
+        text(s, Inches(1.25), y + Inches(0.15), Inches(6.3), Inches(0.34), t, size=15, bold=True)
+        text(s, Inches(1.25), y + Inches(0.52), Inches(6.3), Inches(0.3), d, size=11, color=MUTED)
+        y += Inches(1.06)
+    device(s, a("a0-workout-midset.png"), Inches(8.6), Inches(1.05), Inches(5.7),
+           "Workout mode — the same referee, coaching")
 
     # ── 5 · on-device AI ──────────────────────────────────────────────────────────────────
     s = slide(prs)
     kicker(s, Inches(0.9), Inches(0.7), "on-device ai")
-    text(s, Inches(0.9), Inches(1.1), Inches(11), Inches(0.9),
-         "A coach that only says what it measured.", size=40, bold=True)
-    text(s, Inches(0.9), Inches(2.15), Inches(6.6), Inches(1.6),
-         f"{FACTS['model']} runs inside the app — no network, no account, "
-         "no request leaves the phone.\n\n"
-         "It is handed a fact sheet built from your own measurements and told it may use "
-         "nothing else. Ask it something the numbers do not cover and it says so.",
-         size=15, color=MUTED, spacing=1.4)
+    y = heading(s, Inches(0.9), Inches(1.1), Inches(7.2), "A coach that only says\nwhat it measured.", size=38)
+    y += Inches(0.35)
+    y = body(s, Inches(0.9), y, Inches(6.6),
+             f"{FACTS['model']} runs inside the app — no network, no account, no request "
+             "leaves the phone.\n\n"
+             "It is handed a fact sheet built from your own measurements and told it may use "
+             "nothing else. Ask it something the numbers do not cover and it says so.",
+             size=15)
+    y += Inches(0.5)
     for i, (t, d, c) in enumerate([
         ("On this phone", "Gemma 3n, offline", SUCCESS),
         ("Cloud", "only if you opt in", EMBER),
         ("Built-in", "template bank, always", MUTED),
     ]):
         x = Inches(0.9 + i * 2.3)
-        card(s, x, Inches(4.1), Inches(2.1), Inches(1.25))
-        text(s, x + Inches(0.2), Inches(4.3), Inches(1.7), Inches(0.35), t, size=13, bold=True, color=c)
-        text(s, x + Inches(0.2), Inches(4.7), Inches(1.75), Inches(0.5), d, size=10, color=MUTED)
-    text(s, Inches(0.9), Inches(5.7), Inches(6.6), Inches(0.9),
-         "The badge on screen always names the voice that answered, because "
-         "\"an AI said it\" and \"a lookup table said it\" are different claims.",
+        card(s, x, y, Inches(2.1), Inches(1.2))
+        text(s, x + Inches(0.2), y + Inches(0.2), Inches(1.75), Inches(0.32), t, size=13, bold=True, color=c)
+        text(s, x + Inches(0.2), y + Inches(0.6), Inches(1.75), Inches(0.45), d, size=10, color=MUTED)
+    body(s, Inches(0.9), y + Inches(1.5), Inches(6.6),
+         "The badge on screen always names the voice that answered, because \"an AI said it\" "
+         "and \"a lookup table said it\" are different claims.",
          size=13, color=EMBER, spacing=1.35)
-    phone(s, a("coach-chat.png"), Inches(8.6), Inches(0.9), Inches(6.1))
+    device(s, a("coach-chat.png"), Inches(8.7), Inches(0.95), Inches(5.8), "Gemma, answering offline")
 
     # ── 6 · outdoors ──────────────────────────────────────────────────────────────────────
     s = slide(prs)
     kicker(s, Inches(0.9), Inches(0.6), "beyond the room")
-    text(s, Inches(0.9), Inches(1.0), Inches(11), Inches(0.9),
-         "Outdoors, the chase is the workout.", size=40, bold=True)
-    text(s, Inches(0.9), Inches(2.0), Inches(5.2), Inches(2.4),
+    heading(s, Inches(0.9), Inches(1.0), Inches(6.0), "Outdoors, the chase is the workout.", size=36)
+    text(s, Inches(0.9), Inches(2.35), Inches(5.2), Inches(2.4),
          "Zombie Run puts a pack on a real map behind you, and they close when your "
          "cadence drops — so stopping is what gets you caught.\n\n"
          "Runs and walks are tracked through six quality gates, and fall back to your "
          "own footsteps indoors, with a stride learned from your outdoor GPS.",
          size=15, color=MUTED, spacing=1.4)
-    phone(s, a("2e-zombie-run.png"), Inches(6.5), Inches(1.55), Inches(5.4))
-    phone(s, a("28-run.png"), Inches(9.4), Inches(1.55), Inches(5.4))
+    device(s, a("2e-zombie-run.png"), Inches(6.6), Inches(1.6), Inches(5.2), "Zombie Run")
+    device(s, a("28-run.png"), Inches(9.6), Inches(1.6), Inches(5.2), "Outdoors")
 
     # ── 7 · video · zombie run ────────────────────────────────────────────────────────────
     s = slide(prs)
     kicker(s, Inches(0.9), Inches(0.5), "live")
-    text(s, Inches(0.9), Inches(0.85), Inches(11), Inches(0.7),
-         "Zombie Run, on a real street.", size=38, bold=True)
+    heading(s, Inches(0.9), Inches(0.85), Inches(11.5), "Zombie Run, on a real street.", size=36)
     vw, vh = Inches(2.7), Inches(4.8)
-    video_slot(s, Inches(2.6), Inches(1.85), vw, vh, zombie[0] if zombie else None, "The chase")
-    video_slot(s, Inches(7.9), Inches(1.85), vw, vh, zombie[1] if len(zombie) > 1 else None, "Caught, and the map")
+    video_slot(s, Inches(2.6), Inches(1.85), vw, vh, zombie[0] if zombie else None,
+               "The head start, and the pack on the map")
+    video_slot(s, Inches(7.9), Inches(1.85), vw, vh, zombie[1] if len(zombie) > 1 else None,
+               "Running it, on a real street")
 
     # ── 8 · video · walking ───────────────────────────────────────────────────────────────
     s = slide(prs)
     kicker(s, Inches(0.9), Inches(0.5), "live")
-    text(s, Inches(0.9), Inches(0.85), Inches(11), Inches(0.7),
-         "A walk, tracked and graded.", size=38, bold=True)
+    heading(s, Inches(0.9), Inches(0.85), Inches(11.5), "A walk, tracked and graded.", size=36)
     video_slot(s, Inches(1.1), Inches(1.85), Inches(2.7), Inches(4.8), walk, "Distance, pace, route")
     text(s, Inches(4.6), Inches(2.2), Inches(7.8), Inches(3),
          "Six quality gates before a fix may move your distance:\n\n"
@@ -296,8 +402,7 @@ def build(zombie, walk):
     # ── 9 · technical depth ───────────────────────────────────────────────────────────────
     s = slide(prs)
     kicker(s, Inches(0.9), Inches(0.6), "technical depth")
-    text(s, Inches(0.9), Inches(1.0), Inches(11), Inches(0.8),
-         "Built to be checked, not just demoed.", size=40, bold=True)
+    heading(s, Inches(0.9), Inches(1.0), Inches(11.5), "Built to be checked, not just demoed.", size=38)
     for i, (v, l) in enumerate([
         (FACTS["tests"], "tests, all green"),
         (FACTS["lines"], "lines of Kotlin"),
@@ -326,8 +431,7 @@ def build(zombie, walk):
     # ── 10 · the phone, and the close ─────────────────────────────────────────────────────
     s = slide(prs)
     kicker(s, Inches(0.9), Inches(0.65), "what the iqoo 15 does")
-    text(s, Inches(0.9), Inches(1.05), Inches(11), Inches(0.85),
-         "Everything that matters happens on the device.", size=38, bold=True)
+    heading(s, Inches(0.9), Inches(1.05), Inches(11.5), "Everything that matters happens on the device.", size=36)
     for i, (t, d) in enumerate([
         ("Camera", "MediaPipe pose and hand tracking at camera rate — the referee, and gesture control without touching the screen"),
         ("Neural engine", "Gemma 3n E2B int4 generating coaching text offline, in about a second"),
