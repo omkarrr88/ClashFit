@@ -25,6 +25,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -129,6 +131,23 @@ fun ZombieRunScreen(graph: AppGraph, nav: NavHostController) {
 
     var started by remember { mutableStateOf(false) }
     var goal by remember { mutableStateOf(Chase()) }
+
+    // Leaving the chase ends the chase.
+    //
+    // The tracking service was started when the head start began and stopped only by the Finish
+    // button on the outcome panel. Back out of a chase instead — with the system gesture, or by
+    // switching tabs — and it kept running: a foreground service holding a GPS lock and a wake
+    // lock for the rest of the session, writing points into a run row that could never be
+    // finished. Neither is visible, which is exactly why it went unnoticed.
+    //
+    // Stopping here runs the service's own finish path, which discards an activity that recorded
+    // nothing, so the abandoned row is cleaned up rather than left behind. `started` is read
+    // through a holder because the effect is keyed on nothing and must see the value at the moment
+    // the screen actually leaves.
+    val running = rememberUpdatedState(started)
+    DisposableEffect(Unit) {
+        onDispose { if (running.value) RunTrackingService.stop(context) }
+    }
     var origin by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var state by remember { mutableStateOf(game.state(0L)) }
     // The last position we were sure of, held here rather than read from the tracker each tick.

@@ -69,6 +69,7 @@ fun NavGraphBuilder.sessionRoutes(graph: AppGraph, nav: NavHostController) {
             onAgain = { s ->
                 nav.navigate(Session(mode = s.mode, exerciseId = s.exerciseId, casual = s.casual, ghostId = s.ghostId)) { popUpTo(Home) }
             },
+            onAskCoach = { id -> nav.navigate(com.clashfit.ui.nav.CoachChat(sessionId = id)) },
         )
     }
 }

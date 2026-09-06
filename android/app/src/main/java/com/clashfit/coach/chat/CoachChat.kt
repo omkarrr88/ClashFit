@@ -50,7 +50,7 @@ class CoachChat(
         llm?.let { engine ->
             if (engine.ready) {
                 val out = runCatchingCancellable {
-                    engine.complete(prompt = prompt, maxTokens = 90, temperature = 0.35f, topK = 25, timeoutMs = 10_000L)
+                    engine.complete(prompt = prompt, maxTokens = 120, temperature = 0.3f, topK = 20, timeoutMs = 12_000L)
                 }
                 clean(out)?.let { return Answer(it, CoachSource.LLM) }
             }
@@ -59,7 +59,7 @@ class CoachChat(
         cloud?.let { c ->
             if (c.isConfigured && cloudAllowed()) {
                 val out = runCatchingCancellable {
-                    c.complete(system = FactSheet.RULES, user = "FACTS\n" + facts.joinToString("\n") { "- $it" } + "\n\nPlayer: $q", maxTokens = 90)
+                    c.complete(system = FactSheet.RULES, user = "FACTS\n" + facts.joinToString("\n") { "- $it" } + "\n\nPlayer: $q", maxTokens = 120)
                 }
                 clean(out)?.let { return Answer(it, CoachSource.CLOUD) }
             }

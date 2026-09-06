@@ -38,6 +38,7 @@ import com.clashfit.ui.components.SectionTitle
 import com.clashfit.ui.components.StatStrip
 import com.clashfit.ui.components.XpBar
 import com.clashfit.ui.nav.About
+import com.clashfit.ui.nav.CoachChat
 import com.clashfit.ui.nav.Account
 import com.clashfit.ui.nav.Achievements
 import com.clashfit.ui.nav.Alarms
@@ -158,6 +159,13 @@ fun YouScreen(graph: AppGraph, nav: NavHostController) {
             SectionTitle("App")
             SectionGap(10)
             ListGroup {
+                NavRow(
+                    "Ask the coach",
+                    { nav.navigate(CoachChat()) },
+                    icon = AppIcons.Bolt,
+                    supporting = "Your form and your history, answered from what was measured",
+                )
+                InnerDivider()
                 NavRow("Account", { nav.navigate(Account) }, icon = AppIcons.Person, tint = InkMuted)
                 InnerDivider()
                 NavRow(

@@ -281,7 +281,13 @@ class SummaryViewModel(private val graph: AppGraph, private val sessionId: Long)
 }
 
 @Composable
-fun SummaryScreen(graph: AppGraph, sessionId: Long, onHome: () -> Unit, onAgain: (SessionEntity) -> Unit) {
+fun SummaryScreen(
+    graph: AppGraph,
+    sessionId: Long,
+    onHome: () -> Unit,
+    onAgain: (SessionEntity) -> Unit,
+    onAskCoach: (Long) -> Unit = {},
+) {
     val vm: SummaryViewModel = viewModel(key = "summary-$sessionId", factory = SummaryViewModel.factory(graph, sessionId))
     val data by vm.data.collectAsStateWithLifecycle()
     val exported by vm.exported.collectAsStateWithLifecycle()
@@ -525,6 +531,10 @@ fun SummaryScreen(graph: AppGraph, sessionId: Long, onHome: () -> Unit, onAgain:
 
         // Action buttons
         val ctx = androidx.compose.ui.platform.LocalContext.current
+        // The strongest thing the coach can do is answer about the set you are looking at, so
+        // the way in is here, while the numbers are still on the screen.
+        SecondaryButton("Ask the coach", Modifier.fillMaxWidth()) { onAskCoach(d.session.id) }
+        SectionGap(10)
         PrimaryButton("Fight again", Modifier.fillMaxWidth()) { onAgain(d.session) }
         Spacer(Modifier.height(10.dp))
         SecondaryButton("Share result", Modifier.fillMaxWidth()) { vm.shareAsImage(ctx) }

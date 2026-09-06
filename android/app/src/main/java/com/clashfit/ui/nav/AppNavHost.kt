@@ -21,6 +21,7 @@ import com.clashfit.core.model.GameMode
 import com.clashfit.data.Prefs
 import com.clashfit.run.runRoutes
 import com.clashfit.ui.screens.breathing.breathingRoutes
+import com.clashfit.ui.screens.chat.coachChatRoutes
 import com.clashfit.ui.screens.challenge.challengeRoutes
 import com.clashfit.ui.screens.duel.duelRoutes
 import com.clashfit.ui.screens.ghosts.ghostsRoutes
@@ -205,6 +206,7 @@ fun AppNavHost(
             ghostsRoutes(graph, nav)     // race a recorded rep timeline
             challengeRoutes(graph, nav)  // dare codes, shared without a server
             breathingRoutes(graph, nav)  // recovery between rounds
+            coachChatRoutes(graph, nav)  // ask the coach about your own numbers
         }
     }
     }

@@ -83,8 +83,11 @@ class CoachChatViewModel(
             ?: facts.firstOrNull { it.startsWith("form average") }
             ?: facts.firstOrNull { it.startsWith("current streak") }
             ?: facts.first()
-        return if (afterSet) "That set is measured. $notable. Ask me about any of it."
-        else "I have your training here. $notable. Ask me anything about it."
+        // The fact lines are written for the model — lower case, colon separated — so the one
+        // that gets spoken aloud is capitalised on the way out rather than spliced in raw.
+        val said = notable.replaceFirstChar { it.uppercase() }
+        return if (afterSet) "That set is measured. $said. Ask me about any of it."
+        else "I have your training here. $said. Ask me anything about it."
     }
 
     private suspend fun buildFacts(afterSet: Boolean): List<String> {

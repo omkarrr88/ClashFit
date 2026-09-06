@@ -74,7 +74,7 @@ enum class Tab(val label: String, val icon: ImageVector, val root: Route, val ow
      */
     WORKOUT(
         "Workout", AppIcons.Grid, WorkoutHome,
-        setOf(WorkoutHome::class, WorkoutSetup::class),
+        setOf(WorkoutHome::class, WorkoutSetup::class, CoachChat::class),
     ),
 
     LEADERBOARD(

@@ -42,6 +42,8 @@ import com.clashfit.ui.components.ListGroup
 import com.clashfit.ui.components.PrimaryButton
 import com.clashfit.ui.components.ScreenScaffold
 import com.clashfit.ui.components.SecondaryButton
+import com.clashfit.ui.nav.CoachChat
+import com.clashfit.ui.components.NavRow
 import com.clashfit.ui.components.SectionGap
 import com.clashfit.ui.components.StatTile
 import com.clashfit.ui.nav.Session
@@ -107,6 +109,13 @@ fun WorkoutHomeScreen(graph: AppGraph, nav: NavHostController) {
                 color = InkFaint,
             )
             SectionGap(20)
+            NavRow(
+                "Ask the coach",
+                { nav.navigate(CoachChat()) },
+                icon = AppIcons.Bolt,
+                supporting = "About your form, your fatigue and what to train next",
+            )
+            SectionGap(16)
 
             PrimaryButton("Start a workout", Modifier.fillMaxWidth()) {
                 scope.launch {

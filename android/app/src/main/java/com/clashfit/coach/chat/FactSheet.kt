@@ -77,17 +77,23 @@ object FactSheet {
                 1L -> "yesterday"
                 else -> "$days days ago"
             }
-            add("- $whenSaid: ${s.exerciseId}, ${s.totalReps} reps, form ${(s.formMean * 100).roundToInt()}, peak fatigue ${s.peakBand.lowercase()}")
+            add("- $whenSaid: ${s.exerciseId}, ${s.totalReps} reps, form score ${(s.formMean * 100).roundToInt()} percent, peak fatigue ${s.peakBand.lowercase()}")
         }
         val recentForm = done.take(5).map { it.formMean }
         val olderForm = done.drop(5).take(5).map { it.formMean }
         if (recentForm.isNotEmpty() && olderForm.isNotEmpty()) {
             val r = (recentForm.average() * 100).roundToInt()
             val o = (olderForm.average() * 100).roundToInt()
-            add("form over the last five sessions: $r, over the five before that: $o")
+            // Both averages, and the word "average" on both, because a lone number next to the
+            // phrase "last five sessions" reads to a small model as a change over those sessions —
+            // it turned an average form score of 20 into "a 20 percent increase".
+            add("average form score over the last five sessions: $r percent; over the five before that: $o percent")
         }
         streak?.let {
-            add("current streak: ${it.current} days, best ever: ${it.best} days")
+            // Pluralised, because this line is spliced into the chat's opening sentence as well
+            // as handed to the model, and "1 days" is the kind of thing a judge reads out loud.
+            fun days(n: Int) = if (n == 1) "1 day" else "$n days"
+            add("current streak: ${days(it.current)}, best ever: ${days(it.best)}")
         }
         meta?.let {
             add("level ${it.progress.level}, called ${it.progress.title}")
@@ -102,18 +108,41 @@ object FactSheet {
      * does, so these ride along with each question. "Say you do not know" is the most important
      * line in the app: a coach that guesses a number is worse than one that shrugs, because the
      * whole claim of this project is that everything on screen was measured.
+     *
+     * The two worked examples are doing most of the work. Told to "speak like a coach" a small
+     * model produces "You are completing 7 sessions. Your current form is 20." — every number
+     * correct, nothing said. Shown one answer in the register wanted, it copies the shape: name
+     * the measurement, say what it means, give one thing to do. The second example exists so that
+     * admitting ignorance has a demonstrated shape too, rather than being a rule it can drift past.
      */
-    const val RULES = """You are the coach in a fitness game. You are talking to the player.
+    const val RULES = """You are a strength coach. You have watched every rep this player has done, because the phone measured them. You are talking to them between sets.
 
-You will be given FACTS: measurements taken from this player's own training, on their phone.
+You will be given FACTS: measurements from this player's own training.
 
-Rules:
+How to answer:
 - Answer only from the FACTS. Never state a number that is not in them.
 - If the FACTS do not answer the question, say so plainly and say what you would need.
-- Cite one concrete number from the FACTS in your answer.
-- Two sentences at most. Plain English. No jargon they have not seen on screen.
+- Name one number, say what it means, then give one thing to do about it.
+- Keep the unit on the number: 78 percent, 46 cm, 12 reps.
+- A score is not a change. Never call a number an increase, a decrease, an improvement or a drop unless the FACTS give you both the before and the after.
+- Never say you lack data and then quote a number in the same answer. Do one or the other.
+- Two sentences. Speak the way a coach speaks in a gym, not the way a report reads.
 - Never comment on their body, weight, appearance or fitness level.
-- Never apologise, never use exclamation marks, never use emoji."""
+- Never apologise, never use exclamation marks, never use emoji.
+
+EXAMPLE
+FACTS
+- reps this set: 12
+- form average 78 percent, first three 88 percent, last three 64 percent
+- depth: 46 cm, lost 7 cm by the end
+Player: why did my depth drop?
+Coach: You lost 7 cm of depth between your first three reps and your last three, so that is fatigue rather than technique. Stop the set two reps earlier and the last ones will look like the first.
+
+EXAMPLE
+FACTS
+- this player has not finished a session yet
+Player: am I getting better?
+Coach: I have nothing measured yet, so anything I said would be a guess. Finish one set and I can tell you exactly what changed."""
 
     /** Rules, facts and the question, in the order a small model reads best. */
     fun prompt(facts: List<String>, question: String, history: List<ChatTurn> = emptyList()): String =
