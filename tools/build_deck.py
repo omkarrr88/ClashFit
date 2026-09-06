@@ -339,7 +339,7 @@ def build(zombie, walk):
     col = px - L - Inches(0.5)
     y = heading(s, L, Inches(1.9), col, "CLASHFIT", size=72)
     y = body(s, L, y + Inches(0.1), col,
-             "Your body is the controller.\nYour camera is the referee.", size=24, color=EMBER, spacing=1.3)
+             "Gamified fitness.\nYour personal fitness coach.", size=24, color=EMBER, spacing=1.3)
     y = body(s, L, y + Inches(0.45), col,
              "A fitness game where a clean rep does more damage than a sloppy one — "
              "because the phone measured the difference.", size=14)
