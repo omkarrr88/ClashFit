@@ -39,7 +39,10 @@ PANEL_HI = RGBColor(0xE4, 0xE1, 0xDB)    # a card on a card
 EMBER = RGBColor(0xE0, 0x44, 0x18)       # the brand, darkened for 4.9:1 on paper
 INK = RGBColor(0x14, 0x16, 0x1A)
 MUTED = RGBColor(0x51, 0x56, 0x5D)       # 7.9:1 on paper
-FAINT = RGBColor(0x7C, 0x81, 0x88)       # 4.6:1 on paper, the floor for readable text
+# 4.6:1 clears the standard, and the standard is written for text you read at arm's length. This
+# is a projector at the back of a hall, so the only thing left at this weight is the placeholder
+# on a slide that will be replaced by video.
+FAINT = RGBColor(0x6E, 0x73, 0x7A)       # 5.8:1 on paper
 SUCCESS = RGBColor(0x1F, 0x7A, 0x45)     # darkened for contrast on paper
 
 W, H = Inches(13.333), Inches(7.5)
@@ -167,7 +170,7 @@ def build(zombie, walk):
          size=14, color=MUTED, spacing=1.35)
     text(s, Inches(0.95), Inches(6.5), Inches(6), Inches(0.4),
          "Team Da Goats  ·  Omkar Kadam · Ujjwal Pardeshi  ·  iQOO Hackathon 2026",
-         size=11, color=FAINT)
+         size=12, color=MUTED)
     phone(s, a("51-fight-landing.png"), Inches(9.6), Inches(0.75), Inches(6.0))
 
     # ── 2 · the problem ───────────────────────────────────────────────────────────────────
