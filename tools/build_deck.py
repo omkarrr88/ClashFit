@@ -89,7 +89,9 @@ def composite(kind, screenshot):
     camera sits in the display, not in the bezel.
     """
     os.makedirs(FRAMED, exist_ok=True)
-    out = os.path.join(FRAMED, f"{kind}-{os.path.basename(screenshot)}")
+    # Always a PNG, whatever came in: the canvas has an alpha channel, and a poster frame arrives
+    # as a JPEG whose extension would otherwise be kept.
+    out = os.path.join(FRAMED, f"{kind}-{os.path.splitext(os.path.basename(screenshot))[0]}.png")
     if os.path.exists(out) and os.path.getmtime(out) >= os.path.getmtime(screenshot):
         return out
     f = FRAME[kind]
@@ -317,7 +319,11 @@ def video_device(s, x, y, height, path, caption):
     hole.shadow.inherit = False
 
     s.shapes.add_picture(f["png"], x, y, width=fw, height=height)
-    text(s, x - Inches(0.5), y + height + Inches(0.14), fw + Inches(1.0), Inches(0.3), caption,
+    # Said out loud, because a poster frame inside a phone looks exactly like a screenshot inside
+    # a phone, and a judge will not guess that one of them moves.
+    text(s, x - Inches(0.5), y + height + Inches(0.12), fw + Inches(1.0), Inches(0.28),
+         "▶  CLICK TO PLAY", size=10, color=EMBER, bold=True, align=PP_ALIGN.CENTER)
+    text(s, x - Inches(0.5), y + height + Inches(0.42), fw + Inches(1.0), Inches(0.3), caption,
          size=10, color=MUTED, align=PP_ALIGN.CENTER)
     return fw
 
@@ -343,6 +349,9 @@ def build(zombie, walk):
     y = body(s, L, y + Inches(0.45), col,
              "A fitness game where a clean rep does more damage than a sloppy one — "
              "because the phone measured the difference.", size=14)
+    body(s, L, y + Inches(0.35), col,
+         "Completely offline. The camera, the coach and every score run locally on the phone.",
+         size=14, color=INK, spacing=1.35)
     text(s, L, Inches(6.55), col, Inches(0.4),
          "Team Da Goats  ·  Omkar Kadam · Ujjwal Pardeshi  ·  iQOO Hackathon 2026", size=12, color=MUTED)
     text(s, px, Inches(0.7) + ph + Inches(0.12), pw, Inches(0.3), "iQOO 15", size=10, color=MUTED, align=PP_ALIGN.CENTER)
@@ -363,20 +372,41 @@ def build(zombie, walk):
          "ClashFit scores depth, range, tempo and alignment on every single rep, on the phone, "
          "and pays you in damage for the good ones.", size=16, color=EMBER, spacing=1.35)
 
-    # ── 3 · the product: four screens, four phones ───────────────────────────────────────
+    # ── 3 · the features: six ways to train, one referee ─────────────────────────────────
+    #
+    # This is the slide a judge scores "end product quality" from, so it enumerates rather than
+    # alludes: one card per feature, each with the real screen inside the real phone, tagged by
+    # who it is for — solo, duo, group — and what it does for them.
     s = slide(prs)
-    kicker(s, L, Inches(0.55), "the product")
-    y = heading(s, L, Inches(0.95), FULL, "A rep is a hit. A sloppy rep is a weak one.", size=34) + Inches(0.35)
-    ph = Inches(4.3)
-    pw = Emu(int(ph * FRAME["front"]["w"] / FRAME["front"]["h"]))
-    gap = (FULL - 4 * pw) // 3
-    for i, (img, cap) in enumerate([
-        ("51-fight-landing.png", "The fight"),
-        ("36-seeded-summary.png", "Every rep graded"),
-        ("30-seeded-progress.png", "Form over time"),
-        ("2f-rewards.png", "Rewards earned"),
-    ]):
-        device(s, a(img), L + i * (pw + gap), y, ph, cap)
+    kicker(s, L, Inches(0.55), "the features")
+    y = heading(s, L, Inches(0.95), FULL, "Six ways to train. One referee.", size=34) + Inches(0.3)
+    cols, gap, rh = 3, Inches(0.3), Inches(2.4)
+    cw = (FULL - (cols - 1) * gap) // cols
+    features = [
+        ("SOLO", "Boss Fight", "51-fight-landing.png",
+         "Every clean rep is a hit. Depth, tempo and form decide the damage; fatigue decides when the boss fights back."),
+        ("DUO", "Duel", "55-duel-rope.png",
+         "Two phones, one boss, no server. Rep for rep over Nearby Connections, with a rope that shows who is ahead."),
+        ("GROUP", "Raid & Relay", "2c-roster.png",
+         "A room full of people against one boss, or one phone passed around a circle (Pass the Phone). Every rep still judged."),
+        ("RECOVERY", "Breathing", "29-breathing.png",
+         "Eight guided patterns between rounds. Each cycle you finish pulls your fatigue band back before the next set."),
+        ("OUTDOORS", "Zombie Run", "zombie map and screen.mp4.poster.jpg",
+         "A pack on a real map behind you. They close when your cadence drops, so stopping is what gets you caught."),
+        ("COACH", "Workout", "a0-workout-midset.png",
+         "A beginner walks into a gym without hiring a trainer. The camera counts, grades the form, and says what to fix."),
+    ]
+    for i, (tag, title, img, detail) in enumerate(features):
+        cx = L + (i % cols) * (cw + gap)
+        cy = y + (i // cols) * (rh + Inches(0.22))
+        card(s, cx, cy, cw, rh)
+        ph = rh - Inches(0.3)
+        pw = device(s, a(img), cx + Inches(0.15), cy + Inches(0.15), ph)
+        tx = cx + Inches(0.15) + pw + Inches(0.18)
+        tw = cw - (tx - cx) - Inches(0.15)
+        text(s, tx, cy + Inches(0.22), tw, Inches(0.25), tag, size=9, color=EMBER, bold=True)
+        text(s, tx, cy + Inches(0.47), tw, Inches(0.36), title, size=13, bold=True)
+        body(s, tx, cy + Inches(0.9), tw, detail, size=10, spacing=1.3)
 
     # ── 4 · the referee ───────────────────────────────────────────────────────────────────
     s = slide(prs)
@@ -446,7 +476,7 @@ def build(zombie, walk):
     s = slide(prs)
     kicker(s, L, Inches(0.5), "live")
     y = heading(s, L, Inches(0.85), FULL, "Zombie Run, on a real street.", size=36) + Inches(0.3)
-    ph = Inches(5.0)
+    ph = Inches(4.8)                         # room under the phone for the play hint and the caption
     pw = Emu(int(ph * FRAME["front"]["w"] / FRAME["front"]["h"]))
     gap = Inches(2.4)
     x1 = (W - 2 * pw - gap) // 2
@@ -457,7 +487,7 @@ def build(zombie, walk):
     s = slide(prs)
     kicker(s, L, Inches(0.5), "live")
     y = heading(s, L, Inches(0.85), FULL, "A walk, tracked and graded.", size=36) + Inches(0.3)
-    ph = Inches(5.0)
+    ph = Inches(4.8)
     pw = video_device(s, L + Inches(0.4), y, ph, walk, "Distance, pace, route")
     tx = L + Inches(0.4) + pw + Inches(0.9)
     tw = W - L - tx
@@ -471,29 +501,51 @@ def build(zombie, walk):
          "jitter filter safe for a slow walk.", size=14, spacing=1.4)
 
     # ── 9 · technical depth ───────────────────────────────────────────────────────────────
+    # The whole stack, one card per layer, with the versions that are actually pinned in the
+    # catalogue. The first version was a single running line of names under the stats, and it
+    # read as a footnote; a judge scoring technical depth wants to see the layers and what each
+    # one is there for.
     s = slide(prs)
-    kicker(s, L, Inches(0.6), "technical depth")
-    y = heading(s, L, Inches(0.95), FULL, "Built to be checked, not just demoed.", size=38) + Inches(0.2)
+    kicker(s, L, Inches(0.55), "technical depth")
+    y = heading(s, L, Inches(0.9), FULL, "The stack, built to be checked.", size=36) + Inches(0.1)
     sw = FULL // 5
     for i, (v, l) in enumerate([
         (FACTS["tests"], "tests, all green"), (FACTS["lines"], "lines of Kotlin"),
         (FACTS["screens"], "screens"), (FACTS["modes"], "game modes"), (FACTS["cold_start"], "cold start"),
     ]):
         yy = stat(s, L + i * sw, y, sw, v, l)
-    y = body(s, L, yy, FULL,
-             "Kotlin 2.3 · Jetpack Compose · Room · CameraX · MediaPipe Tasks (Vision + GenAI) · "
-             "Filament 3D · osmdroid · Firebase Auth & Firestore", size=14, color=EMBER, spacing=1.3) + Inches(0.25)
-    # One line of detail each, so three rows fit under two lines of stack. The longer versions
-    # wrapped, and the third card ran off the slide.
-    for t, d in [
-        ("One engine, many modes",
-         "The same counter, depth gate and form score run the fight, the gym log and the clinic test."),
-        ("Pure core, testable on the JVM",
-         "Scoring, fatigue, routes and rewards are Android-free: 942 tests run in seconds, no device."),
-        ("Rendered screenshot baselines",
-         "Every screen is rendered at 320 dp, 384 dp, tablet and 1.5x text before any phone sees it."),
-    ]:
-        y = row_card(s, L, y, FULL, t, d, title_w=Inches(3.4)) + Inches(0.1)
+    y = yy
+    cols, gap, rh = 4, Inches(0.22), Inches(1.82)
+    cw = (FULL - (cols - 1) * gap) // cols
+    stack = [
+        ("LANGUAGE & UI", ["Kotlin 2.3 · Coroutines & Flow", "Jetpack Compose · Material 3",
+                           "Type-safe Navigation Compose", "kotlinx.serialization"]),
+        ("PERCEPTION", ["CameraX 1.6 on Camera2", "MediaPipe Tasks Vision 1.0",
+                        "PoseLandmarker · 33 points", "GestureRecognizer · hands"]),
+        ("ON-DEVICE AI", ["MediaPipe Tasks GenAI", "Gemma 3n E2B · int4 · 3.1 GB",
+                          "LlmInference · 1024 tokens", "Template fallback, offline too"]),
+        ("3D & MAPS", ["Filament 1.75 · glTF boss", "osmdroid 6.1 · map tiles",
+                       "Fused Location Provider", "Foreground tracking service"]),
+        ("DATA", ["Room 2.8 · SQLite, schema v7", "DataStore Preferences",
+                  "Per-set history, local-first", "KSP code generation"]),
+        ("CONNECTIVITY", ["Nearby Connections · Duel", "Firebase Auth · optional",
+                          "Firestore · score snapshots", "Nothing else leaves the phone"]),
+        ("TESTING", ["JUnit · kotlin.test · Turbine", "Robolectric 4.16 · JVM Android",
+                     "Roborazzi 1.73 · screenshots", "942 tests · pure-JVM core"]),
+        ("BUILD", ["AGP 9.4 · Gradle Kotlin DSL", "KSP 2.3 · Compose compiler",
+                   "compileSdk 37 · minSdk 29", "Version catalogue, pinned"]),
+    ]
+    for i, (tag, items) in enumerate(stack):
+        cx = L + (i % cols) * (cw + gap)
+        cy = y + (i // cols) * (rh + Inches(0.18))
+        card(s, cx, cy, cw, rh)
+        text(s, cx + Inches(0.2), cy + Inches(0.17), cw - Inches(0.4), Inches(0.25), tag, size=9, color=EMBER, bold=True)
+        body(s, cx + Inches(0.2), cy + Inches(0.46), cw - Inches(0.4), "\n".join(items), size=11, color=INK, spacing=1.3)
+    y = y + 2 * rh + Inches(0.18) + Inches(0.14)
+    body(s, L, y, FULL,
+         "One engine under every mode — the same counter, depth gate and form score run the fight, the "
+         "gym log and the clinic test. Every screen is rendered at 320 dp, 384 dp, tablet and 1.5x text "
+         "before a phone sees it.", size=11, spacing=1.3)
 
     # ── 10 · the phone, and the close ─────────────────────────────────────────────────────
     s = slide(prs)
