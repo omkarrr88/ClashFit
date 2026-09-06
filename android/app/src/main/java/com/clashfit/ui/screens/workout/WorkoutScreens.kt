@@ -195,8 +195,12 @@ fun WorkoutSetupScreen(graph: AppGraph, nav: NavHostController, workoutId: Long,
     // Re-read whenever the exercise changes, and whenever we come back from a finished set.
     LaunchedEffect(exerciseId, workoutId) {
         val dao = graph.db.workouts()
-        last = runCatching { dao.lastSetOf(exerciseId, workoutId) }.getOrNull()
-        doneThisWorkout = runCatching { dao.setCountOf(workoutId, exerciseId) }.getOrDefault(0)
+        val done = runCatching { dao.setCountOf(workoutId, exerciseId) }.getOrDefault(0)
+        doneThisWorkout = done
+        // The same set number, from the last time this exercise was trained. Comparing set one to
+        // last week's fifth set flatters you: the fifth is always the worst, so the number on
+        // screen would be one you beat by accident.
+        last = runCatching { dao.lastSetAt(exerciseId, done + 1, workoutId) }.getOrNull()
         heaviestKg = runCatching { dao.heaviestKg(exerciseId) }.getOrNull()
         typed = ""
     }
@@ -263,11 +267,11 @@ fun WorkoutSetupScreen(graph: AppGraph, nav: NavHostController, workoutId: Long,
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatTile(
                     sameWorkoutLast?.let { "${it.reps}" } ?: "—",
-                    "Last reps", Modifier.weight(1f), color = Ember,
+                    "Set ${doneThisWorkout + 1} reps", Modifier.weight(1f), color = Ember,
                 )
                 StatTile(
                     sameWorkoutLast?.let { unit.show(it.weightKg) } ?: "—",
-                    "Last ${unit.label}", Modifier.weight(1f),
+                    "Set ${doneThisWorkout + 1} ${unit.label}", Modifier.weight(1f),
                 )
                 StatTile(
                     heaviestKg?.let { unit.show(it) } ?: "—",
@@ -277,8 +281,9 @@ fun WorkoutSetupScreen(graph: AppGraph, nav: NavHostController, workoutId: Long,
             if (sameWorkoutLast != null) {
                 SectionGap(10)
                 Text(
-                    "Beat ${sameWorkoutLast.reps} reps at ${unit.show(sameWorkoutLast.weightKg)} " +
-                        "${unit.label} and this set is progress.",
+                    "Last time, set ${doneThisWorkout + 1} was ${sameWorkoutLast.reps} reps at " +
+                        "${unit.show(sameWorkoutLast.weightKg)} ${unit.label}. Beat it and this set " +
+                        "is progress.",
                     style = MaterialTheme.typography.bodySmall, color = InkMuted,
                 )
             }

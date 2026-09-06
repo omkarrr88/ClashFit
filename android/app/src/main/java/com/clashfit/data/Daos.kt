@@ -128,6 +128,24 @@ interface WorkoutDao {
     )
     suspend fun lastSetOf(exerciseId: String, exceptWorkoutId: Long): WorkoutSetEntity?
 
+    /**
+     * The same set number, from the last workout that reached it.
+     *
+     * A log that only remembers "your last set" tells you your fifth set when you are about to do
+     * your first, and a fifth set is always the worst one — so the number on screen is a number you
+     * would beat by accident. Sets are compared like with like: set one against last week's set
+     * one, set three against last week's set three.
+     *
+     * Deliberately the most recent rather than the best. A personal record has its own line; this
+     * one answers "what did I actually do last time", and an all-time best from four months ago is
+     * a different and much less useful question.
+     */
+    @Query(
+        "SELECT * FROM workout_sets WHERE exerciseId = :exerciseId AND setIndex = :setIndex " +
+            "AND workoutId != :exceptWorkoutId ORDER BY endedAtMs DESC LIMIT 1",
+    )
+    suspend fun lastSetAt(exerciseId: String, setIndex: Int, exceptWorkoutId: Long): WorkoutSetEntity?
+
     /** The heaviest set ever recorded for this exercise, for the personal record line. */
     @Query("SELECT MAX(weightKg) FROM workout_sets WHERE exerciseId = :exerciseId")
     suspend fun heaviestKg(exerciseId: String): Float?
