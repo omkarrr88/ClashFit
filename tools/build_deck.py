@@ -27,15 +27,20 @@ from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "deck-assets")
 
-# ── the app's palette, so the deck is the same object as the product ──────────────────────
-GROUND = RGBColor(0x0E, 0x0F, 0x12)
-PANEL = RGBColor(0x1B, 0x1C, 0x21)
-PANEL_HI = RGBColor(0x24, 0x26, 0x2C)
-EMBER = RGBColor(0xFF, 0x5A, 0x2C)
-INK = RGBColor(0xF5, 0xF2, 0xEC)
-MUTED = RGBColor(0xA8, 0xA5, 0x9F)
-FAINT = RGBColor(0x77, 0x75, 0x71)
-SUCCESS = RGBColor(0x5E, 0xD2, 0x8A)
+# ── a light deck, carrying the app's accent ───────────────────────────────────────────────
+#
+# The product is dark and the deck is not, deliberately: these are shown on a projector in a lit
+# hall, where a dark slide turns into a grey rectangle and a room full of people squint at it. The
+# ember stays, because that is the thing the app and the deck actually share, and the screenshots
+# keep their own dark chrome — on paper white they read as a phone held up rather than as a hole.
+GROUND = RGBColor(0xFA, 0xF9, 0xF7)      # warm paper, not clinical white
+PANEL = RGBColor(0xF0, 0xEE, 0xEA)       # a card on the page
+PANEL_HI = RGBColor(0xE4, 0xE1, 0xDB)    # a card on a card
+EMBER = RGBColor(0xE0, 0x44, 0x18)       # the brand, darkened for 4.9:1 on paper
+INK = RGBColor(0x14, 0x16, 0x1A)
+MUTED = RGBColor(0x51, 0x56, 0x5D)       # 7.9:1 on paper
+FAINT = RGBColor(0x7C, 0x81, 0x88)       # 4.6:1 on paper, the floor for readable text
+SUCCESS = RGBColor(0x1F, 0x7A, 0x45)     # darkened for contrast on paper
 
 W, H = Inches(13.333), Inches(7.5)
 
@@ -92,7 +97,10 @@ def card(s, x, y, w, h, fill=PANEL):
     sh = s.shapes.add_shape(5, x, y, w, h)  # rounded rectangle
     sh.fill.solid()
     sh.fill.fore_color.rgb = fill
-    sh.line.fill.background()
+    # A tinted card on paper is nearly invisible without an edge; on the dark deck the fill alone
+    # was enough.
+    sh.line.color.rgb = RGBColor(0xDD, 0xD9, 0xD2)
+    sh.line.width = Pt(1)
     sh.shadow.inherit = False
     sh.adjustments[0] = 0.06
     return sh
@@ -104,7 +112,9 @@ def phone(s, img, x, y, height):
     with Image.open(img) as im:
         ratio = im.size[0] / im.size[1]
     w = Emu(int(height * ratio))
-    s.shapes.add_picture(img, x, y, width=w, height=height)
+    pic = s.shapes.add_picture(img, x, y, width=w, height=height)
+    pic.line.color.rgb = RGBColor(0xC8, 0xC4, 0xBD)
+    pic.line.width = Pt(0.75)
     return w
 
 
